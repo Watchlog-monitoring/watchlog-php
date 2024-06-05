@@ -7,56 +7,65 @@ use GuzzleHttp\Exception\RequestException;
 
 class Watchlog
 {
-    private $url;
+    // Define the URL as a class constant
+    private const URL = 'http://localhost:3774';
     private $client;
 
-    public function __construct($url = 'http://localhost:3774')
+    // Constructor to initialize the Guzzle HTTP client
+    public function __construct()
     {
-        $this->url = $url;
         $this->client = new Client();
     }
 
+    // Method to send the metric to the server
     private function sendMetric($method, $metric, $value = 1)
     {
-        try {
-            if (is_numeric($value)) {
-                $data = [
-                    'query' => [
-                        'method' => $method,
-                        'metric' => $metric,
-                        'value' => $value,
-                    ]
-                ];
-                $this->client->requestAsync('GET', $this->url, $data)
-                    ->then(
-                        function ($response) {
-                            // Handle response if needed
-                        },
-                        function ($exception) {
-                            echo "Error in sendMetric: {$exception->getMessage()}\n";
-                        }
-                    )->wait();
-            }
-        } catch (RequestException $e) {
-            echo "Error in sendMetric: {$e->getMessage()}\n";
+        // Ensure the value is numeric
+        if (!is_numeric($value)) {
+            return;
         }
+
+        // Prepare the data for the request
+        $data = [
+            'query' => [
+                'method' => $method,
+                'metric' => $metric,
+                'value' => $value,
+            ]
+        ];
+
+        // Send an asynchronous GET request to the server
+        $this->client->requestAsync('GET', self::URL, $data)
+            ->then(
+                function ($response) {
+                    // Handle response if needed
+                },
+                function ($exception) {
+                    // Handle exceptions
+                    echo "Error in sendMetric: {$exception->getMessage()}\n";
+                }
+            )->wait(); // Wait for the asynchronous request to complete
     }
 
+    // Public method to increment a metric
     public function increment($metric, $value = 1)
     {
         $this->sendMetric('increment', $metric, $value);
     }
 
+    // Public method to decrement a metric
     public function decrement($metric, $value = 1)
     {
         $this->sendMetric('decrement', $metric, $value);
     }
 
+    // Public method to set a gauge value for a metric
     public function gauge($metric, $value)
     {
         $this->sendMetric('gauge', $metric, $value);
     }
 
+    // Public method to set a percentage value for a metric
     public function percentage($metric, $value)
     {
         if (is_numeric($value) && $value >= 0 && $value <= 100) {
@@ -64,6 +73,7 @@ class Watchlog
         }
     }
 
+    // Public method to set a system byte value for a metric
     public function systembyte($metric, $value)
     {
         $this->sendMetric('systembyte', $metric, $value);
