@@ -1,0 +1,13 @@
+{
+    "name": "metrics-tracker/watchlog",
+    "description": "A PHP package for sending metrics.",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "MetricsTracker\\": "src/"
+        }
+    },
+    "require": {
+        "guzzlehttp/guzzle": "^7.0"
+    }
+}
