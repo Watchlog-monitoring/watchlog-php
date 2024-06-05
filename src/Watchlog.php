@@ -10,7 +10,7 @@ class Watchlog
     private $url;
     private $client;
 
-    public function __construct($url = 'http://localhost:3775')
+    public function __construct($url = 'https://localhost:3775')
     {
         $this->url = $url;
         $this->client = new Client();
