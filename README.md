@@ -1,6 +1,7 @@
 
 # Watchlog Usage Documentation
 
+
 ## Introduction
 The `Watchlog` class is a simple PHP class for sending various types of metrics to a server. It uses the Guzzle HTTP client for making asynchronous HTTP requests.
 
