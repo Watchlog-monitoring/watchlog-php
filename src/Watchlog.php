@@ -7,74 +7,81 @@ use GuzzleHttp\Exception\RequestException;
 
 class Watchlog
 {
-    // Define the URL as a class constant
-    private const URL = 'http://localhost:3774';
-    private $client;
+    /** @var string آدرس APM agent */
+    private string $agentUrl;
 
-    // Constructor to initialize the Guzzle HTTP client
+    /** @var Client کلاینت Guzzle */
+    private Client $client;
+
     public function __construct()
     {
+        // اگر KUBERNETES_SERVICE_HOST ست شده باشد، در کوبرنیتیز اجرا می‌شویم
+        $isKubernetes = getenv('KUBERNETES_SERVICE_HOST') !== false;
+
+        // تنظیم آدرس Agent بر اساس محیط
+        $this->agentUrl = $isKubernetes
+            ? 'http://watchlog-node-agent:3774'
+            : 'http://127.0.0.1:3774';
+
+        // در صورت نیاز می‌توانید اینجا base_uri را هم روی client ست کنید:
+        // $this->client = new Client(['base_uri' => $this->agentUrl]);
         $this->client = new Client();
     }
 
-    // Method to send the metric to the server
-    private function sendMetric($method, $metric, $value = 1)
+    /**
+     * درخواست ارسال متریک
+     *
+     * @param string $method
+     * @param string $metric
+     * @param mixed  $value
+     */
+    private function sendMetric(string $method, string $metric, $value = 1): void
     {
-        // Ensure the value is numeric
         if (!is_numeric($value)) {
             return;
         }
 
-        // Prepare the data for the request
-        $data = [
+        $options = [
             'query' => [
                 'method' => $method,
                 'metric' => $metric,
-                'value' => $value,
-            ]
+                'value'  => $value,
+            ],
+            'timeout' => 1, // ثانیه
         ];
 
-        // Send an asynchronous GET request to the server
-        $this->client->requestAsync('GET', self::URL, $data)
+        $this->client
+            ->requestAsync('GET', $this->agentUrl, $options)
             ->then(
-                function ($response) {
-                    // Handle response if needed
-                },
-                function ($exception) {
-                    // Handle exceptions
-                    echo "Error in sendMetric: {$exception->getMessage()}\n";
-                }
-            )->wait(); // Wait for the asynchronous request to complete
+                fn($response) => null,
+                fn($exception) => error_log("Watchlog sendMetric error: " . $exception->getMessage())
+            )
+            ->wait();
     }
 
-    // Public method to increment a metric
-    public function increment($metric, $value = 1)
+    public function increment(string $metric, $value = 1): void
     {
         $this->sendMetric('increment', $metric, $value);
     }
 
-    // Public method to decrement a metric
-    public function decrement($metric, $value = 1)
+    public function decrement(string $metric, $value = 1): void
     {
         $this->sendMetric('decrement', $metric, $value);
     }
 
-    // Public method to set a gauge value for a metric
-    public function gauge($metric, $value)
+    public function gauge(string $metric, $value): void
     {
         $this->sendMetric('gauge', $metric, $value);
     }
 
-    // Public method to set a percentage value for a metric
-    public function percentage($metric, $value)
+    public function percentage(string $metric, $value): void
     {
         if (is_numeric($value) && $value >= 0 && $value <= 100) {
             $this->sendMetric('percentage', $metric, $value);
         }
     }
 
-    // Public method to set a system byte value for a metric
-    public function systembyte($metric, $value)
+    public function systembyte(string $metric, $value): void
     {
         $this->sendMetric('systembyte', $metric, $value);
     }
