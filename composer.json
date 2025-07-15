@@ -1,5 +1,5 @@
 {
-    "name": "metrics-tracker/watchlog",
+    "name": "watchlog/watchlog-php",
     "description": "A PHP package for sending metrics.",
     "type": "library",
     "autoload": {
