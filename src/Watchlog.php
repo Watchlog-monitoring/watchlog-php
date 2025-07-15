@@ -3,70 +3,92 @@
 namespace MetricsTracker;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
 
 class Watchlog
 {
-    /** @var string آدرس APM agent */
-    private string $agentUrl;
-
-    /** @var Client کلاینت Guzzle */
     private Client $client;
+    private string $agentUrl;
+    private static ?bool $isK8s = null;
+    private static ?string $cachedUrl = null;
 
     public function __construct()
     {
-        // اگر KUBERNETES_SERVICE_HOST ست شده باشد، در کوبرنیتیز اجرا می‌شویم
-        $isKubernetes = getenv('KUBERNETES_SERVICE_HOST') !== false;
-
-        // تنظیم آدرس Agent بر اساس محیط
-        $this->agentUrl = $isKubernetes
-            ? 'http://watchlog-node-agent:3774'
-            : 'http://127.0.0.1:3774';
-
-        // در صورت نیاز می‌توانید اینجا base_uri را هم روی client ست کنید:
-        // $this->client = new Client(['base_uri' => $this->agentUrl]);
-        $this->client = new Client();
+        $this->client   = new Client();
+        $this->agentUrl = self::getServerUrl();
     }
 
-    /**
-     * درخواست ارسال متریک
-     *
-     * @param string $method
-     * @param string $metric
-     * @param mixed  $value
-     */
+    private static function isRunningInK8s(): bool
+    {
+        if (self::$isK8s !== null) {
+            return self::$isK8s;
+        }
+
+        $tokenPath = '/var/run/secrets/kubernetes.io/serviceaccount/token';
+        if (is_file($tokenPath)) {
+            return self::$isK8s = true;
+        }
+
+        if (is_readable('/proc/1/cgroup')) {
+            $content = @file_get_contents('/proc/1/cgroup');
+            if (strpos($content, 'kubepods') !== false) {
+                return self::$isK8s = true;
+            }
+        }
+
+        $ip = @gethostbyname('kubernetes.default.svc.cluster.local');
+        if ($ip !== 'kubernetes.default.svc.cluster.local' && filter_var($ip, FILTER_VALIDATE_IP)) {
+            return self::$isK8s = true;
+        }
+
+        return self::$isK8s = false;
+    }
+
+    private static function getServerUrl(): string
+    {
+        if (self::$cachedUrl !== null) {
+            return self::$cachedUrl;
+        }
+
+        self::$cachedUrl = self::isRunningInK8s()
+            ? 'http://watchlog-node-agent.monitoring.svc.cluster.local:3774'
+            : 'http://127.0.0.1:3774';
+
+        return self::$cachedUrl;
+    }
+
     private function sendMetric(string $method, string $metric, $value = 1): void
     {
-        if (!is_numeric($value)) {
+        if (!is_numeric($value) || $metric === '') {
             return;
         }
 
         $options = [
-            'query' => [
+            'query'   => [
                 'method' => $method,
                 'metric' => $metric,
                 'value'  => $value,
             ],
-            'timeout' => 1, // ثانیه
+            'timeout' => 1,
         ];
 
+        // ارسال async بدون لاگ خطا
         $this->client
             ->requestAsync('GET', $this->agentUrl, $options)
-            ->then(
-                fn($response) => null,
-                fn($exception) => error_log("Watchlog sendMetric error: " . $exception->getMessage())
-            )
-            ->wait();
+            ->then(fn($response) => null, fn($exception) => null);
     }
 
     public function increment(string $metric, $value = 1): void
     {
-        $this->sendMetric('increment', $metric, $value);
+        if ($value > 0) {
+            $this->sendMetric('increment', $metric, $value);
+        }
     }
 
     public function decrement(string $metric, $value = 1): void
     {
-        $this->sendMetric('decrement', $metric, $value);
+        if ($value > 0) {
+            $this->sendMetric('decrement', $metric, $value);
+        }
     }
 
     public function gauge(string $metric, $value): void
@@ -83,6 +105,8 @@ class Watchlog
 
     public function systembyte(string $metric, $value): void
     {
-        $this->sendMetric('systembyte', $metric, $value);
+        if (is_numeric($value) && $value > 0) {
+            $this->sendMetric('systembyte', $metric, $value);
+        }
     }
 }
