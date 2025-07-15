@@ -1,3 +1,10 @@
+## [1.1.8](https://github.com/Watchlog-monitoring/watchlog-php/compare/1.1.7...1.1.8) (2025-07-15)
+
+
+### Bug Fixes
+
+* change composer name ([acf375e](https://github.com/Watchlog-monitoring/watchlog-php/commit/acf375ee626aaadbd7dbb7db5d71aa10f4399783))
+
 ## [1.1.7](https://github.com/Watchlog-monitoring/watchlog-php/compare/1.1.6...1.1.7) (2025-07-15)
 
 
